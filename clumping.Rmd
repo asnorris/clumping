@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
+library(rstanarm)
 ```
 
 Do students clump by gender in Gov 1006? 
@@ -69,16 +70,25 @@ calc_clumped_tables <- function(seating){
   # to do a fair bit of fussing to make sure this is working. Test cases would
   # be good!
   
-  clumps <- 
-    (sum(plan[1:4] == "F") %in% c(0, 4)) +
-    (sum(plan[5:8] == "F") %in% c(0, 4)) +
-    (sum(plan[9:12] == "F") %in% c(0, 4)) +
-    (sum(plan[13:16] == "F") %in% c(0, 4)) +
-    (sum(plan[17:20] == "F") %in% c(0, 4)) +
-    (sum(plan[21:24] == "F") %in% c(0, 4)) +
-    (sum(plan[25:28] == "F") %in% c(0, 4))
+  # clumps <- 
+  #   (sum(plan[1:4] == "F") %in% c(0, 4)) +
+  #   (sum(plan[5:8] == "F") %in% c(0, 4)) +
+  #   (sum(plan[9:12] == "F") %in% c(0, 4)) +
+  #   (sum(plan[13:16] == "F") %in% c(0, 4)) +
+  #   (sum(plan[17:20] == "F") %in% c(0, 4)) +
+  #   (sum(plan[21:24] == "F") %in% c(0, 4)) +
+  #   (sum(plan[25:28] == "F") %in% c(0, 4))
   
-  return(clumps)
+  f_clumps <- 
+    (sum(plan[1:4] == "F") %in% c(4)) +
+    (sum(plan[5:8] == "F") %in% c(4)) +
+    (sum(plan[9:12] == "F") %in% c(4)) +
+    (sum(plan[13:16] == "F") %in% c(4)) +
+    (sum(plan[17:20] == "F") %in% c(4)) +
+    (sum(plan[21:24] == "F") %in% c(4)) +
+    (sum(plan[25:28] == "F") %in% c(4))
+  
+  return(f_clumps)
 }
 
 ```
@@ -95,6 +105,21 @@ sim <-
   tibble(replication = 1:10000) %>% 
   mutate(seating_plan = map(replication, ~ seat_a_class())) %>% 
   mutate(clumps = map_int(seating_plan, ~ calc_clumped_tables(.)))
+
+
+# create a confidence interval
+
+quantile(sim$clumps, c(0.025, 0.975))
+
+# calculate the p value.  Use pnorm to find the p value.  I used the mean function to find the mean. The p value is below 0.05 which means that the result is significantly significant and therefore we REJECT THE NULL
+
+num_greater_than_2 <- sim %>%
+  filter(clumps >= 2) %>%
+  count()
+
+num_greater_than_2/nrow(sim)
+
+# This means that females DO CLUMP - the low p value 
 
 ```
 
@@ -114,6 +139,25 @@ sim %>%
          y = "Percentage of Simulations out of 10,000")
 ```
 
+How could we change this code to figure out if women clump more than men?
 
+```{r}
+# model to evaluate: "Causal impact of giving a break on midterm complaints. Seems to encourage a certain improvement in those students' grades."
 
+n <- 1000
+true_ability <- rnorm(n, 10, 5)
+noise_1 <- rnorm(n, 0, 5)
+noise_2 <- rnorm(n, 0, 5)
+midterm <- true_ability + noise_1
+final <- true_ability + noise_2
+exams <- data.frame(midterm, final)
+
+fit_1 <- stan_glm(final ~ midterm, data = exams)
+
+exams %>%
+  ggplot(aes(midterm, final)) + 
+  geom_point() +
+  geom_smooth(method = "glm", se = TRUE)
+
+```
 
